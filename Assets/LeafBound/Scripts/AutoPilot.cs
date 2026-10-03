@@ -23,7 +23,7 @@ namespace LeafBound
         float time, nextLog;
         int shotIndex, lastLevel = 1, lastCaptureFrame = -1;
         float quitAt = -1f, levelShotAt = -1f;
-        bool learned, climbShot, swingShot, powerStrikeShot, slashBlastShot, rageShot, dropsShot, pickupShot;
+        bool learned, learnedDash, dashShot, climbShot, swingShot, powerStrikeShot, slashBlastShot, rageShot, dropsShot, pickupShot;
 
         public static AutoPilot FromCommandLine(Game game)
         {
@@ -97,6 +97,7 @@ namespace LeafBound
             if (!powerStrikeShot && midSwing && p.Attack == AttackKind.PowerStrike) powerStrikeShot = Capture("power_strike");
             if (!slashBlastShot && midSwing && p.Attack == AttackKind.SlashBlast) slashBlastShot = Capture("slash_blast");
             if (!rageShot && p.IsAttacking && p.Attack == AttackKind.Rage && progress > 0.45f) rageShot = Capture("rage");
+            if (!dashShot && p.Motor.IsDashing && progress > 0.4f) dashShot = Capture("dash");
 
             int resting = 0, flying = 0;
             foreach (var drop in game.Drops)
@@ -130,6 +131,8 @@ namespace LeafBound
                 game.LearnSkill(SkillId.SlashBlast);
                 game.LearnSkill(SkillId.Rage);
             }
+            // The first level-up's skill points go into Wind Dash.
+            if (learned && !learnedDash && p.Skills.Points > 0) learnedDash = game.LearnSkill(SkillId.Dash);
             game.Hud.ShowInventory = time > 17.5f && time < 21f;
             game.Hud.ShowSkills = time > 34f && time < 37f;
 
@@ -198,6 +201,14 @@ namespace LeafBound
 
             float dx = target.Position.x - m.Position.x;
             int dir = dx > 0f ? 1 : -1;
+            int dashCost = SkillDef.Dash.MpCost(p.Skills.Level(SkillId.Dash));
+            if (learnedDash && p.DashCooldown <= 0f && p.Stats.Mp >= dashCost + 4 && Mathf.Abs(dx) > 2.5f && Mathf.Abs(dx) < 4.5f)
+            {
+                // Close the gap by dashing straight through the target.
+                input.Set(dir > 0 ? GameAction.Right : GameAction.Left, true);
+                input.Set(GameAction.Dash, true);
+                return;
+            }
             if (Mathf.Abs(dx) > 1.2f || m.Facing != dir)
             {
                 input.Set(dir > 0 ? GameAction.Right : GameAction.Left, true);

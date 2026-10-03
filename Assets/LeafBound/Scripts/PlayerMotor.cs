@@ -40,6 +40,10 @@ namespace LeafBound
         int ignoredFoothold = -1;
         float ignoreTimer;
         float ropeCooldown;
+        float dashTimer, dashSpeed;
+        int dashDir;
+
+        public bool IsDashing => dashTimer > 0f;
 
         public Rect Hitbox => new Rect(Position.x - HalfWidth, Position.y, HalfWidth * 2f, Height);
 
@@ -53,11 +57,28 @@ namespace LeafBound
             ignoredFoothold = -1;
             ignoreTimer = 0f;
             ropeCooldown = 0f;
+            dashTimer = 0f;
+        }
+
+        /// <summary>
+        /// A fast horizontal burst. Ignores gravity and input while it lasts, follows the floor on the
+        /// ground, keeps going through the air off a ledge, and stops at the map edge. Not from a rope.
+        /// </summary>
+        public bool StartDash(int dir, float distance, float duration)
+        {
+            if (State == MotorState.Climb || dir == 0 || distance <= 0f || duration <= 0f) return false;
+            dashDir = dir > 0 ? 1 : -1;
+            Facing = dashDir;
+            dashSpeed = distance / duration;
+            dashTimer = duration;
+            Velocity = new Vector2(dashDir * dashSpeed, 0f);
+            return true;
         }
 
         /// <summary>Thrown back and up, away from fromX, when something hurts the player.</summary>
         public void Knockback(float fromX)
         {
+            dashTimer = 0f;
             float dir = Position.x >= fromX ? 1f : -1f;
             State = MotorState.Air;
             Foothold = -1;
@@ -78,6 +99,12 @@ namespace LeafBound
                 if (ignoreTimer <= 0f) ignoredFoothold = -1;
             }
             if (ropeCooldown > 0f) ropeCooldown -= dt;
+
+            if (IsDashing)
+            {
+                TickDash(dt, map);
+                return;
+            }
 
             int h = (input.Held(GameAction.Right) ? 1 : 0) - (input.Held(GameAction.Left) ? 1 : 0);
             switch (State)
@@ -201,6 +228,38 @@ namespace LeafBound
                     Rope = -1;
                     ropeCooldown = RopeRegrabDelay;
                 }
+            }
+        }
+
+        void TickDash(float dt, MapData map)
+        {
+            float step = Mathf.Min(dt, dashTimer);
+            dashTimer -= dt;
+            Velocity = new Vector2(dashDir * dashSpeed, 0f);
+            float before = Position.x;
+            Position.x += dashDir * dashSpeed * step;
+            ClampToMap(map);
+            if (Position.x == before) dashTimer = 0f; // pinned against the map edge
+
+            if (State == MotorState.Ground && !map.Footholds[Foothold].Covers(Position.x))
+            {
+                int next = map.FindFootholdNear(Position.x, Position.y, 0.05f);
+                if (next >= 0)
+                {
+                    Foothold = next;
+                }
+                else
+                {
+                    State = MotorState.Air; // dashed off a ledge: fall once the dash ends
+                    Foothold = -1;
+                }
+            }
+
+            if (dashTimer <= 0f)
+            {
+                dashTimer = 0f;
+                // Come out of the dash at running speed so it flows into movement.
+                Velocity = new Vector2(dashDir * WalkSpeed, 0f);
             }
         }
 

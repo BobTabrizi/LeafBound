@@ -173,6 +173,66 @@ namespace LeafBound.Tests
             Assert.AreEqual(MotorState.Ground, motor.State);
         }
 
+        void FinishDash()
+        {
+            for (int i = 0; i < 120 && motor.IsDashing; i++) motor.Tick(Dt, input, map, false);
+            Assert.IsFalse(motor.IsDashing, "dash should end");
+        }
+
+        [Test]
+        public void DashCoversItsDistanceAlongTheGround()
+        {
+            PlaceOn(3f, 0f);
+            Assert.IsTrue(motor.StartDash(1, 4.2f, 0.22f));
+            FinishDash();
+            Assert.AreEqual(7.2f, motor.Position.x, 0.01f);
+            Assert.AreEqual(MotorState.Ground, motor.State);
+            Assert.AreEqual(0f, motor.Position.y);
+        }
+
+        [Test]
+        public void DashStopsAtTheMapEdge()
+        {
+            PlaceOn(28f, 0f);
+            motor.StartDash(1, 5f, 0.22f);
+            FinishDash();
+            Assert.AreEqual(map.MaxX - PlayerMotor.HalfWidth, motor.Position.x);
+        }
+
+        [Test]
+        public void AirDashHoldsItsHeight()
+        {
+            motor.Teleport(new Vector2(3f, 5f));
+            motor.StartDash(1, 4f, 0.22f);
+            FinishDash();
+            Assert.AreEqual(5f, motor.Position.y, 1e-4f, "no gravity during the dash");
+            Run(1.5f);
+            Assert.AreEqual(MotorState.Ground, motor.State, "falls once the dash ends");
+        }
+
+        [Test]
+        public void DashingOffALedgeFallsAfterward()
+        {
+            PlaceOn(10f, 2.5f);
+            motor.StartDash(1, 4f, 0.22f);
+            FinishDash();
+            Assert.AreEqual(MotorState.Air, motor.State);
+            Assert.AreEqual(2.5f, motor.Position.y, 1e-4f);
+            Run(1.5f);
+            Assert.AreEqual(0, motor.Foothold);
+        }
+
+        [Test]
+        public void CannotDashFromARope()
+        {
+            PlaceOn(18f, 0f);
+            input.Set(GameAction.Up, true);
+            Run(0.3f);
+            Assert.AreEqual(MotorState.Climb, motor.State);
+            Assert.IsFalse(motor.StartDash(1, 4f, 0.22f));
+            Assert.IsFalse(motor.IsDashing);
+        }
+
         [Test]
         public void KnockbackPushesAwayFromAttacker()
         {

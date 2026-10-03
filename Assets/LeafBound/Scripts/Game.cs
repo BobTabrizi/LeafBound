@@ -22,6 +22,7 @@ namespace LeafBound
         static readonly Color HpHealColor = new Color(0.45f, 1f, 0.45f);
         static readonly Color MpHealColor = new Color(0.45f, 0.75f, 1f);
         static readonly Color RageColor = new Color(1f, 0.4f, 0.2f);
+        static readonly Color WindColor = new Color(0.75f, 0.95f, 1f);
 
         sealed class SpawnSlot
         {
@@ -216,6 +217,7 @@ namespace LeafBound
             if (p.Invincible > 0f) p.Invincible -= dt;
             if (p.PotionCooldown > 0f) p.PotionCooldown -= dt;
             if (p.PickupCooldown > 0f) p.PickupCooldown -= dt;
+            if (p.DashCooldown > 0f) p.DashCooldown -= dt;
             TickBuffs(dt);
             TickRegen(dt);
 
@@ -241,6 +243,7 @@ namespace LeafBound
             if (p.PickupCooldown <= 0f && Controls.Held(GameAction.Pickup)) TryPickup();
 
             p.Motor.Tick(dt, Controls, Map, p.IsAttacking);
+            if (p.Attack == AttackKind.Dash && p.Motor.IsDashing) DashSweep();
             if (p.Motor.JumpedThisTick) sfx.Play(sfx.Jump, 0.7f);
             if (p.Motor.Position.y < Map.BottomY - 5f) p.Motor.Teleport(Map.PlayerSpawn);
             CheckMobContact();
@@ -249,6 +252,7 @@ namespace LeafBound
         void TryStartAction()
         {
             // Skills take priority over the basic attack when both keys are held.
+            if (Controls.Held(GameAction.Dash) && TryCast(SkillId.Dash, AttackKind.Dash)) return;
             if (Controls.Held(GameAction.Skill1) && TryCast(SkillId.PowerStrike, AttackKind.PowerStrike)) return;
             if (Controls.Held(GameAction.Skill2) && TryCast(SkillId.SlashBlast, AttackKind.SlashBlast)) return;
             if (Controls.Held(GameAction.Skill3) && TryCast(SkillId.Rage, AttackKind.Rage)) return;
@@ -268,12 +272,18 @@ namespace LeafBound
                 Notify($"You haven't learned {def.Name} yet. Press K to spend skill points.");
                 return false;
             }
+            if (kind == AttackKind.Dash && Player.DashCooldown > 0f) return false;
             if (!Player.Stats.SpendMp(def.MpCost(level)))
             {
                 Notify("Not enough MP.");
                 return false;
             }
             Player.StartAttack(kind);
+            if (kind == AttackKind.Dash)
+            {
+                StartDash(level);
+                return true;
+            }
             sfx.Play(kind == AttackKind.Rage ? sfx.Buff : sfx.Skill);
             if (kind != AttackKind.Rage) sfx.Play(sfx.Swing);
             return true;
@@ -312,6 +322,8 @@ namespace LeafBound
                 case AttackKind.Rage:
                     ApplyRage(skills.Level(SkillId.Rage));
                     break;
+                case AttackKind.Dash:
+                    break; // Wind Dash hits along its path in DashSweep
             }
         }
 
@@ -340,6 +352,48 @@ namespace LeafBound
                 if (killed) OnMobKilled(target);
             }
             sfx.Play(sfx.Hit);
+        }
+
+        void StartDash(int level)
+        {
+            var p = Player;
+            var m = p.Motor;
+            int h = (Controls.Held(GameAction.Right) ? 1 : 0) - (Controls.Held(GameAction.Left) ? 1 : 0);
+            m.StartDash(h != 0 ? h : m.Facing, SkillDef.Dash.DashDistance(level), SkillDef.DashDuration);
+            p.DashCooldown = SkillDef.DashCooldown;
+            p.DashHits.Clear();
+            sfx.Play(sfx.Dash);
+            sfx.Play(sfx.DashVoice, 2f);
+            Effects.Text(m.Position + new Vector2(0f, PlayerMotor.Height + 0.6f), "HASAGI!", WindColor, 30, 1.1f);
+        }
+
+        /// <summary>Cuts every monster the dash passes through, once each, up to the skill's target limit.</summary>
+        void DashSweep()
+        {
+            var p = Player;
+            var m = p.Motor;
+            int level = p.Skills.Level(SkillId.Dash);
+            int maxTargets = SkillDef.Dash.MaxTargets(level);
+            int percent = SkillDef.Dash.DamagePercent(level);
+            var box = m.Hitbox;
+            box.xMin -= 0.4f;
+            box.xMax += 0.4f;
+
+            foreach (var mob in mobs)
+            {
+                if (p.DashHits.Count >= maxTargets) break;
+                if (mob.IsDead || p.DashHits.Contains(mob) || !box.Overlaps(mob.Hitbox)) continue;
+                p.DashHits.Add(mob);
+                int damage = Mathf.Max(1, Mathf.RoundToInt(p.Stats.RollDamage(rng, out bool critical) * percent / 100f));
+                bool killed = mob.TakeHit(damage, m.Position.x - m.Facing);
+                Effects.DamageNumber(mob.Position + new Vector2(0f, mob.Def.Height + 0.2f), damage, critical, onPlayer: false);
+                Effects.Burst(mob.Position + new Vector2(0f, mob.Def.Height * 0.5f), WindColor, 8, 6f, 0.3f, 0f);
+                sfx.Play(sfx.Hit);
+                if (killed) OnMobKilled(mob);
+            }
+
+            float y = 0.2f + (float)rng.NextDouble() * 1.1f;
+            Effects.Burst(m.Position + new Vector2(-m.Facing * 0.4f, y), WindColor, 2, 1.5f, 0.3f, 0f);
         }
 
         void ApplyRage(int level)
@@ -470,7 +524,7 @@ namespace LeafBound
         void CheckMobContact()
         {
             var p = Player;
-            if (p.Invincible > 0f) return;
+            if (p.Invincible > 0f || p.Motor.IsDashing) return; // dashing slips past monsters
             var box = p.Motor.Hitbox;
             foreach (var mob in mobs)
             {

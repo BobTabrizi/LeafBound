@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace LeafBound
 {
-    public enum SkillId { PowerStrike, SlashBlast, Rage }
+    public enum SkillId { PowerStrike, SlashBlast, Rage, Dash }
 
     /// <summary>A warrior skill and how it scales with level. Pure data and formulas.</summary>
     public sealed class SkillDef
@@ -21,9 +21,14 @@ namespace LeafBound
         public static readonly SkillDef PowerStrike = new SkillDef(SkillId.PowerStrike, "Power Strike", 10);
         public static readonly SkillDef SlashBlast = new SkillDef(SkillId.SlashBlast, "Slash Blast", 10);
         public static readonly SkillDef Rage = new SkillDef(SkillId.Rage, "Rage", 10);
+        public static readonly SkillDef Dash = new SkillDef(SkillId.Dash, "Wind Dash", 10);
 
         /// <summary>Indexed by SkillId.</summary>
-        public static readonly SkillDef[] All = { PowerStrike, SlashBlast, Rage };
+        public static readonly SkillDef[] All = { PowerStrike, SlashBlast, Rage, Dash };
+
+        /// <summary>Wind Dash timing: how long the burst lasts and how soon it can be used again.</summary>
+        public const float DashDuration = 0.22f;
+        public const float DashCooldown = 0.8f;
 
         public static SkillDef Get(SkillId id) => All[(int)id];
 
@@ -34,7 +39,8 @@ namespace LeafBound
             {
                 case SkillId.PowerStrike: return 4 + level / 2;
                 case SkillId.SlashBlast: return 6 + level / 2;
-                default: return 10 + level;
+                case SkillId.Rage: return 10 + level;
+                default: return 5 + level / 3;
             }
         }
 
@@ -46,6 +52,7 @@ namespace LeafBound
             {
                 case SkillId.PowerStrike: return 155 + 10 * level;
                 case SkillId.SlashBlast: return 60 + 5 * level;
+                case SkillId.Dash: return 110 + 10 * level;
                 default: return 0;
             }
         }
@@ -57,12 +64,14 @@ namespace LeafBound
             {
                 case SkillId.PowerStrike: return 1;
                 case SkillId.SlashBlast: return Mathf.Min(6, 2 + (level + 2) / 3);
+                case SkillId.Dash: return 3 + level / 3;
                 default: return 0;
             }
         }
 
         public int AttackBonus(int level) => Id == SkillId.Rage && level > 0 ? 2 * level : 0;
         public float Duration(int level) => Id == SkillId.Rage && level > 0 ? 40f + 8f * level : 0f;
+        public float DashDistance(int level) => Id == SkillId.Dash && level > 0 ? 4f + 0.2f * level : 0f;
 
         public string Describe(int level)
         {
@@ -72,8 +81,10 @@ namespace LeafBound
                     return $"{DamagePercent(level)}% damage to one monster. MP {MpCost(level)}";
                 case SkillId.SlashBlast:
                     return $"{DamagePercent(level)}% damage to up to {MaxTargets(level)} monsters. MP {MpCost(level)}";
-                default:
+                case SkillId.Rage:
                     return $"+{AttackBonus(level)} attack for {Duration(level):0} sec. MP {MpCost(level)}";
+                default:
+                    return $"Dash {DashDistance(level):0.0} through up to {MaxTargets(level)} monsters, {DamagePercent(level)}%. MP {MpCost(level)}";
             }
         }
     }

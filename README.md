@@ -1,8 +1,13 @@
 # LeafBound
 
 A small 2D side-scrolling action RPG in the style of MapleStory, built in Unity 6.3 LTS
-(6000.3.25f1). Everything is drawn and synthesized in code. The project has no image or
-audio assets, and all names and art are original.
+(6000.3.25f1). Everything is drawn and synthesized in code, apart from one voice clip.
+
+The playable hero is a fan-made pixel-art **Yasuo** from League of Legends. Yasuo is Riot Games'
+character, so keep this a free, non-commercial fan project (per Riot's fan content policy), or
+swap the hero out before any commercial release. Everything else is original. The "Hasagi!" voice
+line in `Assets/LeafBound/Resources/Voice/Hasagi.wav` is generated with Windows text-to-speech,
+not taken from the game. To use a different recording, replace that file (any short WAV works).
 
 This first version is one map, **Mossy Meadow**:
 
@@ -11,8 +16,9 @@ This first version is one map, **Mossy Meadow**:
 - Sprout Slimes (Lv.1) and Capshrooms (Lv.4) that wander, chase you after being hit, and respawn
 - Sword combat with damage numbers, critical hits and knockback; touching a monster hurts you
 - EXP, levels and stat growth; fainting revives you at the start of the map
-- Skills with MP and skill points: **Power Strike** (one big hit), **Slash Blast** (hits up to 6 monsters)
-  and **Rage** (attack buff). You start with 3 SP and earn 3 more per level; spend them in the Skills window
+- Skills with MP and skill points: **Power Strike** (one big hit), **Slash Blast** (hits up to 6 monsters),
+  **Rage** (attack buff) and **Wind Dash** (a short-cooldown dash that cuts through every monster in its path
+  and shouts "HASAGI!"). You start with 3 SP and earn 3 more per level; spend them in the Skills window
 - Drops: monsters drop mesos (bronze, gold and piles of coins), Red/Blue Potions and loot (Slime Gel,
   Capshroom Cap). Drops pop out, land on platforms, bob, blink before vanishing after 60s, and fly to you on pickup
 - Inventory window with Use/Etc tabs, potion hotkeys, slow natural HP/MP regeneration
@@ -27,6 +33,7 @@ This first version is one map, **Mossy Meadow**:
 | Down + Jump | Drop through a platform |
 | Ctrl / X | Attack (hold to keep swinging) |
 | Q / E / R | Power Strike / Slash Blast / Rage |
+| Shift | Wind Dash (hold Left/Right to choose the direction) |
 | Z | Pick up loot (hold to grab several) |
 | 1 / 2 | Red Potion / Blue Potion |
 | I / K | Inventory / Skills window (Esc closes) |
@@ -54,7 +61,7 @@ Assets/LeafBound/
     Drop.cs           Loot lying in the world: physics, bobbing, pickup
     MapData.cs        Map layout and collision queries; Mossy Meadow is defined here
     MapView.cs        Scenery: sky, parallax hills, clouds, platforms, ropes, decor
-    Player.cs         Player state and the part-based animated character view
+    Player.cs         Player state and the part-based animated character view (Yasuo rig)
     ArtLibrary.cs     All sprites, drawn with PixelCanvas
     Hud.cs            IMGUI heads-up display
     Effects.cs        Damage numbers and particles

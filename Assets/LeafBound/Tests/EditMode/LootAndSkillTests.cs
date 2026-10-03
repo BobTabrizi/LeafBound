@@ -23,6 +23,13 @@ namespace LeafBound.Tests
             Assert.AreEqual(48f, SkillDef.Rage.Duration(1));
             Assert.AreEqual(0, SkillDef.Rage.DamagePercent(5));
 
+            Assert.AreEqual(5, SkillDef.Dash.MpCost(1));
+            Assert.AreEqual(120, SkillDef.Dash.DamagePercent(1));
+            Assert.AreEqual(3, SkillDef.Dash.MaxTargets(1));
+            Assert.AreEqual(6, SkillDef.Dash.MaxTargets(10));
+            Assert.AreEqual(4.2f, SkillDef.Dash.DashDistance(1), 1e-4f);
+            Assert.AreEqual(0f, SkillDef.PowerStrike.DashDistance(5));
+
             foreach (var def in SkillDef.All)
             {
                 Assert.AreEqual(0, def.MpCost(0), def.Name);

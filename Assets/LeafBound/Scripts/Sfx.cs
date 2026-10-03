@@ -11,7 +11,10 @@ namespace LeafBound
         const float Tau = Mathf.PI * 2f;
 
         public float Volume = 0.35f;
-        public readonly AudioClip Jump, Swing, Hit, Kill, LevelUp, Hurt, Pickup, Potion, Skill, Buff;
+        public readonly AudioClip Jump, Swing, Hit, Kill, LevelUp, Hurt, Pickup, Potion, Skill, Buff, Dash;
+
+        /// <summary>Voice line for Wind Dash, from Resources/Voice/Hasagi.wav (null if the file is missing).</summary>
+        public readonly AudioClip DashVoice;
 
         readonly AudioSource source;
         readonly List<AudioClip> owned = new List<AudioClip>();
@@ -65,6 +68,16 @@ namespace LeafBound
                 Mathf.Sin(Tau * (500f * t - 200f / (Tau * 18f) * Mathf.Cos(Tau * 18f * t))) * 0.3f * (1f - t / T));
 
             Skill = Make("Skill", 0.3f, (t, T) => Triangle(Sweep(t, T, 400f, 1400f)) * 0.3f * (1f - t / T));
+
+            float dashLowPass = 0f;
+            Dash = Make("Dash", 0.28f, (t, T) =>
+            {
+                // Rising rush of air.
+                dashLowPass += (Noise() - dashLowPass) * Mathf.Lerp(0.08f, 0.5f, t / T);
+                return dashLowPass * 1.6f * Mathf.Sin(Mathf.PI * t / T);
+            });
+
+            DashVoice = Resources.Load<AudioClip>("Voice/Hasagi"); // an asset, so not in owned
 
             float[] buffNotes = { 392f, 523.25f, 659.25f, 783.99f };
             Buff = Make("Buff", 0.45f, (t, T) =>

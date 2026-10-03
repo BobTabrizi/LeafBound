@@ -4,7 +4,7 @@ using UnityEngine;
 namespace LeafBound
 {
     /// <summary>What the current swing is: a basic attack, an attack skill, or a buff cast.</summary>
-    public enum AttackKind { Basic, PowerStrike, SlashBlast, Rage }
+    public enum AttackKind { Basic, PowerStrike, SlashBlast, Rage, Dash }
 
     /// <summary>The hero: movement, stats, skills, inventory and timers. Game resolves combat.</summary>
     public sealed class Player
@@ -28,6 +28,9 @@ namespace LeafBound
         public float PickupCooldown;
         public float RegenTimer;
         public float AuraTimer;
+        public float DashCooldown;
+        /// <summary>Monsters already cut by the current dash, so each is hit once.</summary>
+        public readonly List<Mob> DashHits = new List<Mob>();
 
         public Player()
         {
@@ -46,6 +49,7 @@ namespace LeafBound
                 case AttackKind.PowerStrike: return 0.5f;
                 case AttackKind.SlashBlast: return 0.55f;
                 case AttackKind.Rage: return 0.5f;
+                case AttackKind.Dash: return SkillDef.DashDuration;
                 default: return 0.45f;
             }
         }
@@ -58,6 +62,7 @@ namespace LeafBound
                 case AttackKind.PowerStrike: return 0.2f;
                 case AttackKind.SlashBlast: return 0.22f;
                 case AttackKind.Rage: return 0.25f;
+                case AttackKind.Dash: return 0f; // damage is dealt along the path instead
                 default: return 0.18f;
             }
         }
@@ -87,9 +92,12 @@ namespace LeafBound
         static readonly Vector2 ShoulderFront = new Vector2(1f, 13f);
         static readonly Vector2 Hand = new Vector2(0f, -5.5f);
         static readonly Vector2 SlashPos = new Vector2(4f, 10f);
+        // Where the ponytail is tied, relative to the head pivot: back of the head from the side, centre from behind.
+        static readonly Vector2 TieSide = new Vector2(-4f, 11f);
+        static readonly Vector2 TieBack = new Vector2(0f, 11f);
 
-        readonly Transform root, rig, legBack, legFront, body, head, armBack, armFront, sword, tomb;
-        readonly SpriteRenderer headRenderer, armBackRenderer, slashRenderer;
+        readonly Transform root, rig, legBack, legFront, body, head, armBack, armFront, sword, ponytail, tomb;
+        readonly SpriteRenderer headRenderer, armBackRenderer, ponytailRenderer, slashRenderer;
         readonly Transform slash;
         readonly List<SpriteRenderer> rigRenderers = new List<SpriteRenderer>();
         readonly Sprite headFront, headBack;
@@ -102,17 +110,19 @@ namespace LeafBound
             rig = new GameObject("Rig").transform;
             rig.SetParent(root, false);
 
-            armBack = Part("ArmBack", art.Arm, ShoulderBack, -1, rig);
+            armBack = Part("ArmBack", art.Arm, ShoulderBack, -2, rig);
             legBack = Part("LegBack", art.Leg, HipBack, 0, rig);
             legFront = Part("LegFront", art.Leg, HipFront, 1, rig);
             body = Part("Body", art.Body, BodyPos, 2, rig);
             head = Part("Head", art.Head, HeadPos, 3, rig);
-            armFront = Part("ArmFront", art.Arm, ShoulderFront, 5, rig);
+            armFront = Part("ArmFront", art.ArmFront, ShoulderFront, 5, rig);
+            ponytail = Part("Ponytail", art.Ponytail, TieSide, -1, head);
             sword = Part("Sword", art.Sword, Hand, 4, armFront);
             slash = Part("Slash", art.Slash, SlashPos, 6, rig);
 
             headRenderer = head.GetComponent<SpriteRenderer>();
             armBackRenderer = armBack.GetComponent<SpriteRenderer>();
+            ponytailRenderer = ponytail.GetComponent<SpriteRenderer>();
             slashRenderer = slash.GetComponent<SpriteRenderer>();
             rigRenderers.Remove(slashRenderer); // the slash fades on its own schedule
             slashRenderer.enabled = false;
@@ -161,7 +171,10 @@ namespace LeafBound
             bool climbing = m.State == MotorState.Climb;
             headRenderer.sprite = climbing ? headBack : headFront;
             // Seen from behind on a rope, both hands reach up over the head.
-            armBackRenderer.sortingOrder = SortBase + (climbing ? 6 : -1);
+            armBackRenderer.sortingOrder = SortBase + (climbing ? 6 : -2);
+            // From behind, the ponytail hangs over the back of the head instead of behind it.
+            ponytailRenderer.sortingOrder = SortBase + (climbing ? 4 : -1);
+            ponytail.localPosition = (climbing ? TieBack : TieSide) * Px;
             sword.gameObject.SetActive(!climbing);
 
             // Angles in degrees; 0 hangs straight down, positive swings forward.
@@ -202,7 +215,17 @@ namespace LeafBound
             }
 
             slashRenderer.enabled = false;
-            if (player.IsAttacking && player.Attack == AttackKind.Rage)
+            if (player.IsAttacking && player.Attack == AttackKind.Dash)
+            {
+                // Low lunge with the blade trailing behind.
+                legF = 50f;
+                legB = -45f;
+                armF = -55f;
+                armB = -70f;
+                swordAngle = -165f;
+                bob = -1f;
+            }
+            else if (player.IsAttacking && player.Attack == AttackKind.Rage)
             {
                 // Buff cast: thrust the sword straight up and hold it.
                 float k = Smooth(Mathf.Clamp01(player.AttackProgress / 0.3f));
@@ -246,7 +269,7 @@ namespace LeafBound
                             size = new Vector3(1.8f, 1.5f, 1f);
                             break;
                         default:
-                            tint = Color.white;
+                            tint = new Color(0.85f, 0.97f, 1f); // a breath of wind
                             size = Vector3.one;
                             break;
                     }
@@ -267,6 +290,7 @@ namespace LeafBound
             armFront.localRotation = Quaternion.Euler(0f, 0f, armF);
             armBack.localRotation = Quaternion.Euler(0f, 0f, armB);
             sword.localRotation = Quaternion.Euler(0f, 0f, swordAngle);
+            ponytail.localRotation = Quaternion.Euler(0f, 0f, PonytailAngle(m, climbing, time));
 
             // Blink while invincible after being hit.
             float alpha = player.Invincible > 0f && Mathf.FloorToInt(time * 14f) % 2 == 0 ? 0.35f : 1f;
@@ -276,6 +300,17 @@ namespace LeafBound
                 c.a = alpha;
                 r.color = c;
             }
+        }
+
+        /// <summary>The ponytail streams back when running and lifts when falling. Negative swings it back and up.</summary>
+        float PonytailAngle(PlayerMotor m, bool climbing, float time)
+        {
+            if (climbing) return Mathf.Sin(climbPhase) * 6f;
+            if (m.IsDashing) return -70f + Mathf.Sin(time * 40f) * 4f; // streams straight back
+            if (m.State == MotorState.Air) return Mathf.Clamp(m.Velocity.y * 2f, -35f, 5f);
+            float speed = Mathf.Min(1f, Mathf.Abs(m.Velocity.x) / PlayerMotor.WalkSpeed);
+            if (speed > 0.06f) return -speed * 35f + Mathf.Sin(walkPhase * 2f) * 5f;
+            return Mathf.Sin(time * 2f) * 3f;
         }
 
         static float Smooth(float t) => t * t * (3f - 2f * t);

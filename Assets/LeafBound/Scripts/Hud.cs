@@ -22,12 +22,14 @@ namespace LeafBound
             "Space / Alt  -  Jump   (Down + Jump: drop)",
             "Ctrl / X  -  Attack",
             "Q / E / R  -  Power Strike / Slash Blast / Rage",
+            "Shift  -  Wind Dash (through monsters)",
             "Z  -  Pick up loot",
             "1 / 2  -  Red / Blue Potion",
             "I / K  -  Inventory / Skills    H  -  Hide help",
         };
 
         static readonly string[] TabNames = { "Use", "Etc" };
+        static readonly string[] SkillKeys = { "Q", "E", "R", "Sh" }; // indexed by SkillId
         static readonly Color PanelColor = new Color(0.07f, 0.08f, 0.12f, 0.94f);
         static readonly Color TitleBarColor = new Color(0.17f, 0.22f, 0.33f, 1f);
         static readonly Color RowColor = new Color(1f, 1f, 1f, 0.06f);
@@ -40,7 +42,7 @@ namespace LeafBound
             public float Age;
         }
 
-        public string PlayerName = "Leafling";
+        public string PlayerName = "Yasuo";
         public bool ShowHelp = true;
         public bool ShowInventory;
         public bool ShowSkills;
@@ -116,7 +118,7 @@ namespace LeafBound
             }
             if (ShowSkills)
             {
-                if (skillsRect.width <= 0f) skillsRect = new Rect(vw - 340f, 190f, 330f, 266f);
+                if (skillsRect.width <= 0f) skillsRect = new Rect(vw - 340f, 190f, 330f, 330f);
                 skillsRect = KeepOnScreen(GUI.Window(SkillsWindowId, skillsRect, SkillsWindow, GUIContent.none, GUIStyle.none), vw, vh);
             }
 
@@ -228,7 +230,7 @@ namespace LeafBound
                 : $"EXP  {s.Exp} / {s.ExpNeeded}  [{s.ExpFraction * 100f:0.00}%]";
             Bar(new Rect(220f, y + 28f, 406f, 16f), s.ExpFraction, new Color(0.95f, 0.8f, 0.2f), exp);
 
-            float slotsLeft = vw - 5f * 44f - 8f;
+            float slotsLeft = vw - (SkillDef.All.Length + 2) * 44f - 8f;
             var attackColor = s.BonusAttack > 0 ? new Color(1f, 0.6f, 0.4f) : Color.white;
             Tinted(new Rect(slotsLeft - 140f, y + 8f, 128f, 18f), $"ATT  {s.MinDamage} ~ {s.MaxDamage}", right, attackColor);
             Tinted(new Rect(slotsLeft - 140f, y + 26f, 128f, 18f), $"{player.Inventory.Mesos:N0} mesos", right, Effects.Gold);
@@ -243,8 +245,9 @@ namespace LeafBound
                 var def = SkillDef.All[i];
                 int level = player.Skills.Level(def.Id);
                 string corner = level > 0 ? def.MpCost(level).ToString() : "-";
-                bool usable = level > 0 && mp >= def.MpCost(level);
-                QuickSlot(new Rect(x + i * 44f, y, 40f, 40f), "QER"[i].ToString(), art.SkillIcon(def.Id), corner, usable);
+                bool cooling = def.Id == SkillId.Dash && player.DashCooldown > 0f;
+                bool usable = level > 0 && mp >= def.MpCost(level) && !cooling;
+                QuickSlot(new Rect(x + i * 44f, y, 40f, 40f), SkillKeys[i], art.SkillIcon(def.Id), corner, usable);
             }
             x += SkillDef.All.Length * 44f;
             var red = player.Inventory.Count(ItemDef.RedPotion);
@@ -400,7 +403,7 @@ namespace LeafBound
             var r = skillsRect;
             if (WindowFrame(r, "Skills")) ShowSkills = false;
             var book = current.Player.Skills;
-            Tinted(new Rect(12f, 30f, 200f, 18f), "Warrior  (keys Q / E / R)", left, DimText);
+            Tinted(new Rect(12f, 30f, 200f, 18f), "Warrior  (keys Q / E / R / Shift)", left, DimText);
             Tinted(new Rect(r.width - 112f, 30f, 100f, 18f), $"SP  {book.Points}", right, Effects.Gold);
 
             float y = 54f;

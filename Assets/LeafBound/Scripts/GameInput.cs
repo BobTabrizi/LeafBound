@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace LeafBound
 {
-    public enum GameAction { Left, Right, Up, Down, Jump, Attack, Skill1, Skill2, Skill3, Pickup, HpPotion, MpPotion }
+    public enum GameAction { Left, Right, Up, Down, Jump, Attack, Skill1, Skill2, Skill3, Pickup, HpPotion, MpPotion, Dash }
 
     /// <summary>
     /// Source of player intent. The keyboard drives real play; tests and the autopilot script it.
@@ -31,6 +31,7 @@ namespace LeafBound
             new[] { KeyCode.Z },
             new[] { KeyCode.Alpha1, KeyCode.Keypad1 },
             new[] { KeyCode.Alpha2, KeyCode.Keypad2 },
+            new[] { KeyCode.LeftShift, KeyCode.RightShift },
         };
 
         public bool Held(GameAction action)

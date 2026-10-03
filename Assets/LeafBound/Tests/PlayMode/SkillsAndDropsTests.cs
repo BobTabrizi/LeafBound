@@ -201,6 +201,64 @@ namespace LeafBound.Tests
             yield return null;
         }
 
+        void FinishDash()
+        {
+            for (int i = 0; i < 60 && game.Player.Motor.IsDashing; i++) game.Tick(Dt);
+            Assert.IsFalse(game.Player.Motor.IsDashing);
+        }
+
+        [UnityTest]
+        public IEnumerator WindDashCutsThroughEveryMonsterInItsPath()
+        {
+            var p = game.Player;
+            game.LearnSkill(SkillId.Dash);
+            var mobsInPath = new[] { Spawn(Target(9999), 1.2f), Spawn(Target(9999), 2f), Spawn(Target(9999), 2.8f) };
+            float startX = PlayerX;
+            int mpBefore = p.Stats.Mp;
+
+            input.Set(GameAction.Dash, true);
+            game.Tick(Dt);
+            input.Clear();
+            Assert.IsTrue(p.Motor.IsDashing);
+            bool shouted = false;
+            foreach (var popup in game.Effects.Popups) shouted |= popup.Text == "HASAGI!";
+            Assert.IsTrue(shouted, "the dash calls out HASAGI!");
+            FinishDash();
+
+            foreach (var mob in mobsInPath) Assert.Less(mob.Hp, mob.Def.MaxHp, "every monster in the path is cut");
+            Assert.AreEqual(startX + SkillDef.Dash.DashDistance(1), PlayerX, 0.05f);
+            Assert.AreEqual(mpBefore - SkillDef.Dash.MpCost(1), p.Stats.Mp);
+            Assert.AreEqual(p.Stats.MaxHp, p.Stats.Hp, "dashing through monsters doesn't hurt");
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator WindDashHasACooldown()
+        {
+            var p = game.Player;
+            game.LearnSkill(SkillId.Dash);
+            input.Set(GameAction.Dash, true);
+            game.Tick(Dt);
+            FinishDash();
+            int mpAfterFirst = p.Stats.Mp;
+            game.Tick(Dt);
+            Assert.IsFalse(p.Motor.IsDashing, "still cooling down");
+            Assert.AreEqual(mpAfterFirst, p.Stats.Mp, "no MP spent while cooling down");
+
+            Run(SkillDef.DashCooldown);
+            Assert.AreEqual(mpAfterFirst - SkillDef.Dash.MpCost(1), p.Stats.Mp, "dashes again once ready");
+            input.Clear();
+            yield return null;
+        }
+
+        [Test]
+        public void HasagiVoiceLineShipsWithTheGame()
+        {
+            var clip = Resources.Load<AudioClip>("Voice/Hasagi");
+            Assert.IsNotNull(clip, "Assets/LeafBound/Resources/Voice/Hasagi.wav");
+            Assert.That(clip.length, Is.InRange(0.2f, 2f));
+        }
+
         [UnityTest]
         public IEnumerator WindowsRenderWithoutErrors()
         {

@@ -14,21 +14,30 @@ namespace LeafBound
         public const int PixelsPerUnit = 16;
 
         static readonly Color32 Line = Rgb(0x2a1e1c);
-        static readonly Color32 Skin = Rgb(0xffd9b3);
-        static readonly Color32 SkinShade = Rgb(0xeab48a);
-        static readonly Color32 Hair = Rgb(0x8a5a2b);
-        static readonly Color32 HairLight = Rgb(0xb57a3c);
         static readonly Color32 White = Rgb(0xffffff);
-        static readonly Color32 Blush = Rgb(0xf7a1a1);
-        static readonly Color32 Tunic = Rgb(0x4f9d4a);
-        static readonly Color32 TunicLight = Rgb(0x72c46a);
         static readonly Color32 Belt = Rgb(0x7a4b22);
         static readonly Color32 Gold = Rgb(0xe0b54a);
-        static readonly Color32 Pants = Rgb(0x5a4632);
-        static readonly Color32 Shoe = Rgb(0x3b2a20);
         static readonly Color32 Blade = Rgb(0xe3ebf2);
         static readonly Color32 BladeShade = Rgb(0x9aa8b5);
         static readonly Color32 Grip = Rgb(0x6b3f1f);
+
+        // Hero: a fan-made pixel Yasuo (League of Legends, Riot Games).
+        static readonly Color32 Skin = Rgb(0xf1c9a0);
+        static readonly Color32 SkinShade = Rgb(0xd9a77c);
+        static readonly Color32 Stubble = Rgb(0xb98c68);
+        static readonly Color32 Hair = Rgb(0x47352b);
+        static readonly Color32 HairLight = Rgb(0x6e5545);
+        static readonly Color32 HairTie = Rgb(0x8a3a2a);
+        static readonly Color32 Tunic = Rgb(0x2f6690);
+        static readonly Color32 TunicDark = Rgb(0x204a6a);
+        static readonly Color32 Sash = Rgb(0xe9dcc0);
+        static readonly Color32 SashShade = Rgb(0xc8b894);
+        static readonly Color32 Pants = Rgb(0x2c2f3a);
+        static readonly Color32 Shoe = Rgb(0x1f1a17);
+        static readonly Color32 Steel = Rgb(0x9aa6b0);
+        static readonly Color32 SteelLight = Rgb(0xd5dde3);
+        static readonly Color32 SteelDark = Rgb(0x66727c);
+        static readonly Color32 KatanaGrip = Rgb(0x231a18);
         static readonly Color32 SlimeGreen = Rgb(0x7ed957);
         static readonly Color32 SlimeDark = Rgb(0x52b03c);
         static readonly Color32 SlimeLight = Rgb(0xd2f7b4);
@@ -64,6 +73,8 @@ namespace LeafBound
         public Sprite HeadBack { get; }
         public Sprite Body { get; }
         public Sprite Arm { get; }
+        public Sprite ArmFront { get; }
+        public Sprite Ponytail { get; }
         public Sprite Leg { get; }
         public Sprite Sword { get; }
         public Sprite Tombstone { get; }
@@ -89,7 +100,7 @@ namespace LeafBound
                 BuildGel(),
                 BuildCapIcon(),
             };
-            skillIcons = new[] { BuildPowerStrikeIcon(), BuildSlashBlastIcon(), BuildRageIcon() };
+            skillIcons = new[] { BuildPowerStrikeIcon(), BuildSlashBlastIcon(), BuildRageIcon(), BuildDashIcon() };
             bronzeCoin = BuildCoin(Rgb(0xc8803c), Rgb(0xe8a868), Rgb(0x8e5524), "BronzeCoin");
             goldCoin = BuildCoin(Rgb(0xf2c94c), Rgb(0xfff09a), Rgb(0xb88a1c), "GoldCoin");
             coinPile = BuildCoinPile();
@@ -97,7 +108,9 @@ namespace LeafBound
             Head = BuildHead(back: false);
             HeadBack = BuildHead(back: true);
             Body = BuildBody();
-            Arm = BuildArm();
+            Arm = BuildArm(pauldron: false);
+            ArmFront = BuildArm(pauldron: true);
+            Ponytail = BuildPonytail();
             Leg = BuildLeg();
             Sword = BuildSword();
             Tombstone = BuildTombstone();
@@ -156,59 +169,98 @@ namespace LeafBound
             c.FillRect(5, 13, 3, 1, HairLight);
             if (!back)
             {
-                c.FillRect(2, 4, 3, 5, Hair); // hair behind the ear
-                c[6, 8] = Hair;               // bangs
-                c[9, 8] = Hair;
+                c.FillRect(2, 3, 3, 6, Hair);  // long hair behind the ear
+                c[7, 8] = Hair;                // ragged fringe
+                c[8, 8] = Hair;
                 c[10, 8] = Hair;
-                c[5, 6] = SkinShade;          // ear
+                c[5, 6] = SkinShade;           // ear
                 c[5, 7] = SkinShade;
                 c.FillRect(10, 5, 2, 3, Line); // eye
                 c[11, 7] = White;
-                c[12, 4] = Blush;
+                c[9, 8] = Line;                // brow angled down toward the nose
+                // A light stubble along the jaw.
+                for (int y = 2; y <= 3; y++)
+                    for (int x = 8; x <= 11; x++)
+                        if ((x + y) % 2 == 0 && c.IsOpaque(x, y)) c[x, y] = Stubble;
             }
             c.Outline(Line);
             return MakeSprite(c, 8f, 2f, back ? "HeadBack" : "Head");
+        }
+
+        /// <summary>The high ponytail, hanging down and back from its tie (the pivot).</summary>
+        Sprite BuildPonytail()
+        {
+            var c = new PixelCanvas(12, 16);
+            c.FillEllipse(8.5f, 12.5f, 2f, 1.8f, Hair);
+            c.FillEllipse(7f, 9.5f, 2.6f, 2.4f, Hair);
+            c.FillEllipse(5f, 6.5f, 2.4f, 2.4f, Hair);
+            c.FillEllipse(3.5f, 3.5f, 1.8f, 2f, Hair);
+            c[2, 2] = Hair;
+            c[2, 1] = Hair;
+            c.Line(7, 11, 5, 6, HairLight);
+            c.FillRect(8, 13, 2, 2, HairTie);
+            c.Outline(Line);
+            return MakeSprite(c, 9f, 13.5f, "Ponytail");
         }
 
         Sprite BuildBody()
         {
             var c = new PixelCanvas(10, 10);
             c.FillRect(2, 1, 6, 8, Tunic);
-            c.FillRect(2, 8, 6, 1, TunicLight);
-            c.FillRect(2, 2, 6, 1, Belt);
-            c[5, 2] = Gold;
+            c.FillRect(2, 1, 1, 8, TunicDark);
+            c.FillRect(5, 7, 2, 2, Skin);  // open collar
+            c.FillRect(2, 2, 6, 2, Sash);
+            c[3, 2] = SashShade;
+            c[2, 1] = SashShade;           // knot tails
             c.Outline(Line);
             return MakeSprite(c, 5f, 1f, "Body");
         }
 
-        Sprite BuildArm()
+        /// <summary>Wrapped forearm; the front arm also wears the steel shoulder plate.</summary>
+        Sprite BuildArm(bool pauldron)
         {
-            var c = new PixelCanvas(5, 9);
-            c.FillRect(1, 4, 3, 4, Tunic);
-            c.FillRect(1, 1, 3, 3, Skin);
+            int ox = pauldron ? 2 : 0;
+            var c = new PixelCanvas(pauldron ? 9 : 5, pauldron ? 11 : 9);
+            c.FillRect(1 + ox, 5, 3, 3, Tunic);
+            c.FillRect(1 + ox, 3, 3, 2, Sash);
+            c[1 + ox, 3] = SashShade;
+            c.FillRect(1 + ox, 1, 3, 2, Skin);
+            if (pauldron)
+            {
+                c.FillEllipse(4.5f, 8f, 3.6f, 2.3f, Steel, minY: 6);
+                for (int x = 0; x < c.Width; x++)
+                    if (c.IsOpaque(x, 6)) c[x, 6] = SteelDark; // shaded lower rim
+                c.FillRect(3, 9, 3, 1, SteelLight);
+            }
             c.Outline(Line);
-            return MakeSprite(c, 2.5f, 7.5f, "Arm");
+            return MakeSprite(c, 2.5f + ox, 7.5f, pauldron ? "ArmFront" : "Arm");
         }
 
         Sprite BuildLeg()
         {
             var c = new PixelCanvas(6, 8);
-            c.FillRect(1, 3, 3, 4, Pants);
-            c.FillRect(1, 1, 4, 2, Shoe);
+            c.FillRect(1, 4, 3, 3, Pants);
+            c.FillRect(1, 2, 3, 2, Sash); // wrapped shins
+            c[1, 3] = SashShade;
+            c.FillRect(1, 1, 4, 1, Shoe);
             c.Outline(Line);
             return MakeSprite(c, 2.5f, 7f, "Leg");
         }
 
+        /// <summary>A katana: wrapped hilt, small guard, long slightly curved blade.</summary>
         Sprite BuildSword()
         {
-            var c = new PixelCanvas(7, 20);
-            c.FillRect(3, 1, 1, 3, Grip);
-            c.FillRect(1, 4, 5, 1, Gold);
-            c.FillRect(2, 5, 3, 12, Blade);
-            c.FillRect(4, 5, 1, 12, BladeShade);
-            c[3, 17] = Blade;
+            var c = new PixelCanvas(7, 24);
+            c.FillRect(3, 1, 2, 5, KatanaGrip);
+            c[3, 2] = Sash;
+            c[4, 4] = Sash;
+            c.FillRect(2, 6, 4, 1, Gold);
+            c.FillRect(3, 7, 2, 13, Blade);
+            c.FillRect(4, 7, 1, 13, BladeShade);
+            c.FillRect(4, 20, 2, 2, Blade);
+            c[5, 22] = Blade;
             c.Outline(Line);
-            return MakeSprite(c, 3.5f, 2.5f, "Sword");
+            return MakeSprite(c, 4f, 3.5f, "Katana");
         }
 
         Sprite BuildTombstone()
@@ -410,6 +462,19 @@ namespace LeafBound
             c[12, 13] = Rgb(0xff9a2c);
             c.Outline(Line);
             return MakeSprite(c, 9f, 9f, "RageIcon");
+        }
+
+        Sprite BuildDashIcon()
+        {
+            var c = IconTile(Rgb(0x1f5a5a));
+            var light = Rgb(0xbfe3ff);
+            c.Line(3, 5, 9, 5, light);   // speed streaks
+            c.Line(2, 9, 11, 9, White);
+            c.Line(4, 13, 10, 13, light);
+            c.Line(11, 5, 14, 9, White); // chevron pointing forward
+            c.Line(14, 9, 11, 13, White);
+            c.Outline(Line);
+            return MakeSprite(c, 9f, 9f, "DashIcon");
         }
 
         // ---------------------------------------------------------------- scenery
