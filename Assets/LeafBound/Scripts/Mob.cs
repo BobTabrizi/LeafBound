@@ -15,17 +15,26 @@ namespace LeafBound
         public float HalfWidth;
         public float Height;
         public MobLook Look;
+        public DropTable Drops = DropTable.None;
 
         public static readonly MobDef SproutSlime = new MobDef
         {
             Name = "Sprout Slime", Level = 1, MaxHp = 18, TouchDamage = 6, Exp = 4,
             Speed = 1.2f, HalfWidth = 0.5f, Height = 0.8f, Look = MobLook.Slime,
+            Drops = new DropTable(0.6f, 3, 9,
+                new DropEntry(ItemDef.SlimeGel, 0.45f),
+                new DropEntry(ItemDef.RedPotion, 0.08f),
+                new DropEntry(ItemDef.BluePotion, 0.05f)),
         };
 
         public static readonly MobDef Capshroom = new MobDef
         {
             Name = "Capshroom", Level = 4, MaxHp = 60, TouchDamage = 12, Exp = 11,
             Speed = 1.6f, HalfWidth = 0.5f, Height = 0.95f, Look = MobLook.Mushroom,
+            Drops = new DropTable(0.65f, 8, 20,
+                new DropEntry(ItemDef.CapshroomCap, 0.4f),
+                new DropEntry(ItemDef.RedPotion, 0.12f),
+                new DropEntry(ItemDef.BluePotion, 0.08f)),
         };
     }
 

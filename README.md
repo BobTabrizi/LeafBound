@@ -11,7 +11,12 @@ This first version is one map, **Mossy Meadow**:
 - Sprout Slimes (Lv.1) and Capshrooms (Lv.4) that wander, chase you after being hit, and respawn
 - Sword combat with damage numbers, critical hits and knockback; touching a monster hurts you
 - EXP, levels and stat growth; fainting revives you at the start of the map
-- Classic bottom status bar (level, HP, EXP %), minimap, message log, name tags, mob HP bars
+- Skills with MP and skill points: **Power Strike** (one big hit), **Slash Blast** (hits up to 6 monsters)
+  and **Rage** (attack buff). You start with 3 SP and earn 3 more per level; spend them in the Skills window
+- Drops: monsters drop mesos (bronze, gold and piles of coins), Red/Blue Potions and loot (Slime Gel,
+  Capshroom Cap). Drops pop out, land on platforms, bob, blink before vanishing after 60s, and fly to you on pickup
+- Inventory window with Use/Etc tabs, potion hotkeys, slow natural HP/MP regeneration
+- Classic bottom status bar (level, HP, MP, EXP %, quickslots, mesos), minimap, buff timer, message log, name tags, mob HP bars
 
 ## Controls
 
@@ -21,6 +26,10 @@ This first version is one map, **Mossy Meadow**:
 | Space / Alt | Jump (hold to keep jumping) |
 | Down + Jump | Drop through a platform |
 | Ctrl / X | Attack (hold to keep swinging) |
+| Q / E / R | Power Strike / Slash Blast / Rage |
+| Z | Pick up loot (hold to grab several) |
+| 1 / 2 | Red Potion / Blue Potion |
+| I / K | Inventory / Skills window (Esc closes) |
 | H / F1 | Show or hide the controls panel |
 | Alt+Enter / Alt+F4 | Toggle fullscreen / quit (built game) |
 
@@ -39,7 +48,10 @@ Assets/LeafBound/
     Game.cs           Root MonoBehaviour: builds the world, runs the tick order, camera
     PlayerMotor.cs    Movement physics over footholds and ropes (pure logic, unit tested)
     PlayerStats.cs    Level, EXP, HP, damage (pure logic)
-    Mob.cs            Monster definitions and AI
+    Mob.cs            Monster definitions, drop tables and AI
+    Skills.cs         Skill formulas and the skill book (SP)
+    Items.cs          Items, loot, drop tables and the inventory
+    Drop.cs           Loot lying in the world: physics, bobbing, pickup
     MapData.cs        Map layout and collision queries; Mossy Meadow is defined here
     MapView.cs        Scenery: sky, parallax hills, clouds, platforms, ropes, decor
     Player.cs         Player state and the part-based animated character view

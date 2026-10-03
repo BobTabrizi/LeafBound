@@ -6,25 +6,24 @@ namespace LeafBound
 {
     /// <summary>
     /// Plays the game by itself when the player is launched with
-    /// <c>-leafbound-autopilot &lt;folder&gt;</c>: hunts on the ground, climbs a rope, hunts again,
-    /// saves screenshots to the folder and logs its state, then quits. Used to smoke-test builds.
+    /// <c>-leafbound-autopilot &lt;folder&gt;</c>: learns skills, hunts with skills and loots on the
+    /// ground, climbs a rope, hunts again, opens the windows, saves screenshots to the folder and
+    /// logs its state, then quits. Used to smoke-test builds.
     /// </summary>
     public sealed class AutoPilot
     {
         public const string Flag = "-leafbound-autopilot";
         const float RopeX = 27f;
 
-        static readonly float[] ShotTimes = { 1.5f, 5f, 10f, 15f, 19f, 23f, 27f, 32f, 37f };
+        static readonly float[] ShotTimes = { 1.5f, 5f, 10f, 15f, 19f, 23f, 27f, 32f, 36f };
 
         readonly Game game;
         readonly ScriptedInput input = new ScriptedInput();
         readonly string outputDir;
         float time, nextLog;
-        int shotIndex;
-        float quitAt = -1f;
-        int lastLevel = 1;
-        float levelShotAt = -1f;
-        bool climbShotTaken, swingShotTaken;
+        int shotIndex, lastLevel = 1, lastCaptureFrame = -1;
+        float quitAt = -1f, levelShotAt = -1f;
+        bool learned, climbShot, swingShot, powerStrikeShot, slashBlastShot, rageShot, dropsShot, pickupShot;
 
         public static AutoPilot FromCommandLine(Game game)
         {
@@ -52,19 +51,22 @@ namespace LeafBound
             if (time >= nextLog)
             {
                 nextLog = time + 1f;
-                var m = game.Player.Motor;
-                var s = game.Player.Stats;
+                var p = game.Player;
+                var m = p.Motor;
+                var s = p.Stats;
                 int alive = 0;
                 foreach (var mob in game.Mobs)
                     if (!mob.IsDead) alive++;
                 Debug.Log($"[autopilot] t={time:0.0} pos=({m.Position.x:0.00},{m.Position.y:0.00}) state={m.State} " +
-                          $"lv={s.Level} exp={s.Exp}/{s.ExpNeeded} hp={s.Hp}/{s.MaxHp} mobs={alive} fps={1f / Mathf.Max(dt, 1e-4f):0}");
+                          $"lv={s.Level} exp={s.Exp}/{s.ExpNeeded} hp={s.Hp}/{s.MaxHp} mp={s.Mp}/{s.MaxMp} " +
+                          $"mesos={p.Inventory.Mesos} gel={p.Inventory.Count(ItemDef.SlimeGel)} cap={p.Inventory.Count(ItemDef.CapshroomCap)} " +
+                          $"red={p.Inventory.Count(ItemDef.RedPotion)} blue={p.Inventory.Count(ItemDef.BluePotion)} " +
+                          $"rage={p.RageTimer:0} sp={p.Skills.Points} drops={game.Drops.Count} mobs={alive} fps={1f / Mathf.Max(dt, 1e-4f):0}");
             }
 
             CaptureEvents();
-            if (shotIndex < ShotTimes.Length && time >= ShotTimes[shotIndex])
+            if (shotIndex < ShotTimes.Length && time >= ShotTimes[shotIndex] && Capture($"shot_{shotIndex:00}"))
             {
-                Capture($"shot_{shotIndex:00}");
                 shotIndex++;
                 if (shotIndex == ShotTimes.Length) quitAt = time + 1f;
             }
@@ -80,39 +82,71 @@ namespace LeafBound
         /// <summary>Extra screenshots of moments the timed shots tend to miss.</summary>
         void CaptureEvents()
         {
-            var player = game.Player;
-            if (player.Stats.Level > lastLevel)
+            var p = game.Player;
+            if (p.Stats.Level > lastLevel)
             {
-                lastLevel = player.Stats.Level;
+                lastLevel = p.Stats.Level;
                 levelShotAt = time + 0.3f;
             }
-            if (levelShotAt > 0f && time >= levelShotAt)
+            if (levelShotAt > 0f && time >= levelShotAt && Capture($"levelup_{lastLevel}")) levelShotAt = -1f;
+
+            float progress = p.AttackProgress;
+            bool midSwing = progress > 0.42f && progress < 0.55f;
+            if (!climbShot && p.Motor.State == MotorState.Climb && p.Motor.Position.y > 2f) climbShot = Capture("climb");
+            if (!swingShot && midSwing && p.Attack == AttackKind.Basic) swingShot = Capture("swing");
+            if (!powerStrikeShot && midSwing && p.Attack == AttackKind.PowerStrike) powerStrikeShot = Capture("power_strike");
+            if (!slashBlastShot && midSwing && p.Attack == AttackKind.SlashBlast) slashBlastShot = Capture("slash_blast");
+            if (!rageShot && p.IsAttacking && p.Attack == AttackKind.Rage && progress > 0.45f) rageShot = Capture("rage");
+
+            int resting = 0, flying = 0;
+            foreach (var drop in game.Drops)
             {
-                levelShotAt = -1f;
-                Capture($"levelup_{lastLevel}");
+                if (drop.CanBePickedUp) resting++;
+                if (drop.IsBeingPickedUp) flying++;
             }
-            if (!climbShotTaken && player.Motor.State == MotorState.Climb && player.Motor.Position.y > 2f)
-            {
-                climbShotTaken = true;
-                Capture("climb");
-            }
-            if (!swingShotTaken && player.AttackProgress > 0.42f && player.AttackProgress < 0.5f)
-            {
-                swingShotTaken = true;
-                Capture("swing");
-            }
+            if (!dropsShot && resting >= 2) dropsShot = Capture("drops");
+            if (!pickupShot && flying > 0) pickupShot = Capture("pickup");
         }
 
-        void Capture(string name) => ScreenCapture.CaptureScreenshot(Path.Combine(outputDir, name + ".png"));
+        /// <summary>One screenshot per frame; returns false so the caller retries next frame.</summary>
+        bool Capture(string name)
+        {
+            if (Time.frameCount == lastCaptureFrame) return false;
+            lastCaptureFrame = Time.frameCount;
+            ScreenCapture.CaptureScreenshot(Path.Combine(outputDir, name + ".png"));
+            return true;
+        }
 
         void Drive()
         {
             input.Clear();
-            var m = game.Player.Motor;
+            var p = game.Player;
+            var m = p.Motor;
+
+            if (!learned && time > 2f)
+            {
+                learned = true;
+                game.LearnSkill(SkillId.PowerStrike);
+                game.LearnSkill(SkillId.SlashBlast);
+                game.LearnSkill(SkillId.Rage);
+            }
+            game.Hud.ShowInventory = time > 17.5f && time < 21f;
+            game.Hud.ShowSkills = time > 34f && time < 37f;
+
+            if (p.Stats.Hp < p.Stats.MaxHp * 0.4f) input.Set(GameAction.HpPotion, true);
+            else if (p.Stats.Mp < 8) input.Set(GameAction.MpPotion, true);
+
+            int rageCost = SkillDef.Rage.MpCost(p.Skills.Level(SkillId.Rage));
+            if (learned && time > 2.5f && p.RageTimer <= 0f && p.Stats.Mp >= rageCost && m.State == MotorState.Ground)
+            {
+                input.Set(GameAction.Skill3, true);
+                return;
+            }
+
             if (time < 20f)
             {
                 if (time > 3f && time < 3.1f) input.Set(GameAction.Jump, true);
-                Hunt(m);
+                Hunt(p);
             }
             else if (time < 30f && !(m.State == MotorState.Ground && m.Position.y > 4f))
             {
@@ -120,13 +154,14 @@ namespace LeafBound
             }
             else
             {
-                Hunt(m);
+                Hunt(p);
             }
         }
 
-        /// <summary>Walks to the nearest monster on the same level and attacks it.</summary>
-        void Hunt(PlayerMotor m)
+        /// <summary>Loots nearby drops when safe, otherwise fights the nearest monster on the same level.</summary>
+        void Hunt(Player p)
         {
+            var m = p.Motor;
             Mob target = null;
             float best = float.MaxValue;
             foreach (var mob in game.Mobs)
@@ -139,11 +174,49 @@ namespace LeafBound
                     target = mob;
                 }
             }
+
+            Drop loot = null;
+            float lootDist = 4f;
+            foreach (var drop in game.Drops)
+            {
+                if (!drop.CanBePickedUp || Mathf.Abs(drop.Position.y - m.Position.y) > 0.5f) continue;
+                float dist = Mathf.Abs(drop.Position.x - m.Position.x);
+                if (dist < lootDist)
+                {
+                    lootDist = dist;
+                    loot = drop;
+                }
+            }
+            if (loot != null && best > 2f)
+            {
+                float ddx = loot.Position.x - m.Position.x;
+                if (Mathf.Abs(ddx) > 0.3f) input.Set(ddx > 0f ? GameAction.Right : GameAction.Left, true);
+                else input.Set(GameAction.Pickup, true);
+                return;
+            }
             if (target == null) return;
 
             float dx = target.Position.x - m.Position.x;
             int dir = dx > 0f ? 1 : -1;
-            if (Mathf.Abs(dx) > 1.2f || m.Facing != dir) input.Set(dir > 0 ? GameAction.Right : GameAction.Left, true);
+            if (Mathf.Abs(dx) > 1.2f || m.Facing != dir)
+            {
+                input.Set(dir > 0 ? GameAction.Right : GameAction.Left, true);
+                return;
+            }
+
+            int inFront = 0;
+            foreach (var mob in game.Mobs)
+            {
+                float ahead = (mob.Position.x - m.Position.x) * dir;
+                if (!mob.IsDead && Mathf.Abs(mob.Position.y - m.Position.y) < 0.5f && ahead > -0.6f && ahead < 2.6f) inFront++;
+            }
+            int mp = p.Stats.Mp;
+            int blastCost = SkillDef.SlashBlast.MpCost(p.Skills.Level(SkillId.SlashBlast));
+            int strikeCost = SkillDef.PowerStrike.MpCost(p.Skills.Level(SkillId.PowerStrike));
+            // Slash Blast for groups, otherwise alternate between the two attack skills while MP lasts.
+            bool preferBlast = inFront >= 2 || Mathf.FloorToInt(time) % 2 == 0;
+            if (learned && preferBlast && mp >= blastCost + 4) input.Set(GameAction.Skill2, true);
+            else if (learned && mp >= strikeCost + 6) input.Set(GameAction.Skill1, true);
             else input.Set(GameAction.Attack, true);
         }
 

@@ -3,23 +3,71 @@ using UnityEngine;
 
 namespace LeafBound
 {
-    /// <summary>The hero: movement, stats and attack/hurt timers. Game resolves combat.</summary>
+    /// <summary>What the current swing is: a basic attack, an attack skill, or a buff cast.</summary>
+    public enum AttackKind { Basic, PowerStrike, SlashBlast, Rage }
+
+    /// <summary>The hero: movement, stats, skills, inventory and timers. Game resolves combat.</summary>
     public sealed class Player
     {
-        public const float AttackDuration = 0.45f;
-        public const float AttackHitTime = 0.18f;
         public const float InvincibleTime = 1.5f;
+        public const int StartingSkillPoints = 3;
+        public const int SkillPointsPerLevel = 3;
 
         public readonly PlayerMotor Motor = new PlayerMotor();
         public readonly PlayerStats Stats = new PlayerStats();
+        public readonly SkillBook Skills = new SkillBook(StartingSkillPoints);
+        public readonly Inventory Inventory = new Inventory();
+
+        public AttackKind Attack;
         public float AttackTimer;
         public bool AttackHitDone;
         public float Invincible;
         public float ReviveTimer;
+        public float RageTimer;
+        public float PotionCooldown;
+        public float PickupCooldown;
+        public float RegenTimer;
+        public float AuraTimer;
+
+        public Player()
+        {
+            Inventory.Add(ItemDef.RedPotion, 5);
+            Inventory.Add(ItemDef.BluePotion, 5);
+        }
 
         public bool IsDead => Stats.IsDead;
         public bool IsAttacking => AttackTimer > 0f;
-        public float AttackProgress => IsAttacking ? 1f - AttackTimer / AttackDuration : 0f;
+        public float AttackProgress => IsAttacking ? 1f - AttackTimer / DurationOf(Attack) : 0f;
+
+        public static float DurationOf(AttackKind kind)
+        {
+            switch (kind)
+            {
+                case AttackKind.PowerStrike: return 0.5f;
+                case AttackKind.SlashBlast: return 0.55f;
+                case AttackKind.Rage: return 0.5f;
+                default: return 0.45f;
+            }
+        }
+
+        /// <summary>When, after the swing starts, its hit lands (or the buff takes effect).</summary>
+        public static float HitTimeOf(AttackKind kind)
+        {
+            switch (kind)
+            {
+                case AttackKind.PowerStrike: return 0.2f;
+                case AttackKind.SlashBlast: return 0.22f;
+                case AttackKind.Rage: return 0.25f;
+                default: return 0.18f;
+            }
+        }
+
+        public void StartAttack(AttackKind kind)
+        {
+            Attack = kind;
+            AttackTimer = DurationOf(kind);
+            AttackHitDone = false;
+        }
     }
 
     /// <summary>
@@ -42,6 +90,7 @@ namespace LeafBound
 
         readonly Transform root, rig, legBack, legFront, body, head, armBack, armFront, sword, tomb;
         readonly SpriteRenderer headRenderer, armBackRenderer, slashRenderer;
+        readonly Transform slash;
         readonly List<SpriteRenderer> rigRenderers = new List<SpriteRenderer>();
         readonly Sprite headFront, headBack;
         float walkPhase, climbPhase, tombHeight;
@@ -60,7 +109,7 @@ namespace LeafBound
             head = Part("Head", art.Head, HeadPos, 3, rig);
             armFront = Part("ArmFront", art.Arm, ShoulderFront, 5, rig);
             sword = Part("Sword", art.Sword, Hand, 4, armFront);
-            var slash = Part("Slash", art.Slash, SlashPos, 6, rig);
+            slash = Part("Slash", art.Slash, SlashPos, 6, rig);
 
             headRenderer = head.GetComponent<SpriteRenderer>();
             armBackRenderer = armBack.GetComponent<SpriteRenderer>();
@@ -153,7 +202,15 @@ namespace LeafBound
             }
 
             slashRenderer.enabled = false;
-            if (player.IsAttacking)
+            if (player.IsAttacking && player.Attack == AttackKind.Rage)
+            {
+                // Buff cast: thrust the sword straight up and hold it.
+                float k = Smooth(Mathf.Clamp01(player.AttackProgress / 0.3f));
+                armF = Mathf.Lerp(armF, 175f, k);
+                armB = Mathf.Lerp(armB, 190f, k);
+                swordAngle = Mathf.Lerp(-70f, 180f, k);
+            }
+            else if (player.IsAttacking)
             {
                 // Overhead swing: raise the sword behind the head, then bring it down in front.
                 float p = player.AttackProgress;
@@ -175,8 +232,28 @@ namespace LeafBound
                 }
                 if (p >= 0.38f && p < 0.75f)
                 {
+                    // Skills tint and enlarge the slash: gold for Power Strike, wide and blue for Slash Blast.
+                    Color tint;
+                    Vector3 size;
+                    switch (player.Attack)
+                    {
+                        case AttackKind.PowerStrike:
+                            tint = new Color(1f, 0.82f, 0.3f);
+                            size = new Vector3(1.3f, 1.3f, 1f);
+                            break;
+                        case AttackKind.SlashBlast:
+                            tint = new Color(0.6f, 0.85f, 1f);
+                            size = new Vector3(1.8f, 1.5f, 1f);
+                            break;
+                        default:
+                            tint = Color.white;
+                            size = Vector3.one;
+                            break;
+                    }
+                    tint.a = 1f - (p - 0.38f) / 0.37f;
                     slashRenderer.enabled = true;
-                    slashRenderer.color = new Color(1f, 1f, 1f, 1f - (p - 0.38f) / 0.37f);
+                    slashRenderer.color = tint;
+                    slash.localScale = size;
                 }
             }
 

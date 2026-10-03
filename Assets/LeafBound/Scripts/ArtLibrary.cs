@@ -76,8 +76,24 @@ namespace LeafBound
         public Sprite Tree { get; }
         public Sprite[] Flowers { get; }
 
+        readonly Sprite[] itemSprites;   // indexed by ItemIcon
+        readonly Sprite[] skillIcons;    // indexed by SkillId
+        readonly Sprite bronzeCoin, goldCoin, coinPile;
+
         public ArtLibrary()
         {
+            itemSprites = new[]
+            {
+                BuildPotion(Rgb(0xe8413c), Rgb(0xff8a80), "RedPotion"),
+                BuildPotion(Rgb(0x3f7fe8), Rgb(0x8fc0ff), "BluePotion"),
+                BuildGel(),
+                BuildCapIcon(),
+            };
+            skillIcons = new[] { BuildPowerStrikeIcon(), BuildSlashBlastIcon(), BuildRageIcon() };
+            bronzeCoin = BuildCoin(Rgb(0xc8803c), Rgb(0xe8a868), Rgb(0x8e5524), "BronzeCoin");
+            goldCoin = BuildCoin(Rgb(0xf2c94c), Rgb(0xfff09a), Rgb(0xb88a1c), "GoldCoin");
+            coinPile = BuildCoinPile();
+
             Head = BuildHead(back: false);
             HeadBack = BuildHead(back: true);
             Body = BuildBody();
@@ -96,6 +112,13 @@ namespace LeafBound
         }
 
         public Sprite MobSprite(MobLook look) => look == MobLook.Mushroom ? Mushroom : Slime;
+        public Sprite ItemSprite(ItemIcon icon) => itemSprites[(int)icon];
+        public Sprite SkillIcon(SkillId id) => skillIcons[(int)id];
+
+        /// <summary>Bigger piles of mesos look richer, as in MapleStory.</summary>
+        public Sprite MesoSprite(int amount) => amount < 10 ? bronzeCoin : amount < 50 ? goldCoin : coinPile;
+
+        public Sprite LootSprite(Loot loot) => loot.IsMesos ? MesoSprite(loot.Mesos) : ItemSprite(loot.Item.Icon);
 
         public static Color32 Rgb(uint rgb) => new Color32((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb, 255);
 
@@ -266,6 +289,127 @@ namespace LeafBound
             c.FillEllipse(10f, 14f, 1.2f, 0.8f, Spot);
             c.Outline(Line);
             return MakeSprite(c, 10f, 0f, "Mushroom");
+        }
+
+        // ---------------------------------------------------------------- loot (pivot at the bottom, so it rests on footholds)
+
+        Sprite BuildPotion(Color32 liquid, Color32 shine, string name)
+        {
+            var c = new PixelCanvas(14, 16);
+            c.FillEllipse(7f, 6f, 5f, 5f, liquid);
+            c.FillRect(5, 10, 4, 3, Rgb(0xdfeef5)); // glass neck
+            c.FillRect(5, 13, 4, 2, Belt);          // cork
+            c[4, 7] = shine;
+            c[4, 8] = shine;
+            c[5, 9] = shine;
+            c.Outline(Line);
+            return MakeSprite(c, 7f, 0f, name);
+        }
+
+        Sprite BuildGel()
+        {
+            var c = new PixelCanvas(14, 12);
+            c.FillEllipse(7f, 5f, 5.5f, 4f, SlimeGreen, minY: 1);
+            c.FillRect(6, 9, 2, 1, SlimeGreen);
+            c.ShadeBelow(2, SlimeDark);
+            c[4, 6] = SlimeLight;
+            c[5, 7] = SlimeLight;
+            c.Outline(Line);
+            return MakeSprite(c, 7f, 0f, "SlimeGel");
+        }
+
+        Sprite BuildCapIcon()
+        {
+            var c = new PixelCanvas(16, 11);
+            c.FillEllipse(8f, 2f, 7f, 7.5f, Cap, minY: 2);
+            c.FillRect(1, 1, 14, 1, CapDark);
+            c.FillEllipse(5f, 6f, 1.4f, 1.1f, Spot);
+            c.FillEllipse(11f, 6.5f, 1.5f, 1.1f, Spot);
+            c.Outline(Line);
+            return MakeSprite(c, 8f, 0f, "CapshroomCap");
+        }
+
+        Sprite BuildCoin(Color32 face, Color32 shine, Color32 rim, string name)
+        {
+            var c = new PixelCanvas(11, 11);
+            c.FillEllipse(5.5f, 5.5f, 4.5f, 4.5f, rim);
+            c.FillEllipse(5.5f, 5.5f, 3.5f, 3.5f, face);
+            c[4, 7] = shine;
+            c[3, 6] = shine;
+            c.FillRect(5, 4, 1, 3, rim);
+            c.Outline(Line);
+            return MakeSprite(c, 5.5f, 0f, name);
+        }
+
+        Sprite BuildCoinPile()
+        {
+            var c = new PixelCanvas(16, 12);
+            var face = Rgb(0xf2c94c);
+            var rim = Rgb(0xb88a1c);
+            c.FillEllipse(5f, 4f, 4f, 3f, rim);
+            c.FillEllipse(11f, 4f, 4f, 3f, rim);
+            c.FillEllipse(8f, 7f, 4f, 3f, rim);
+            c.FillEllipse(5f, 4.5f, 3f, 2f, face);
+            c.FillEllipse(11f, 4.5f, 3f, 2f, face);
+            c.FillEllipse(8f, 7.5f, 3f, 2f, face);
+            c[7, 9] = Rgb(0xfff09a);
+            c.Outline(Line);
+            return MakeSprite(c, 8f, 0f, "CoinPile");
+        }
+
+        // ---------------------------------------------------------------- skill icons (18x18 tiles)
+
+        PixelCanvas IconTile(Color32 background)
+        {
+            var c = new PixelCanvas(18, 18);
+            c.FillRect(1, 1, 16, 16, background);
+            return c;
+        }
+
+        Sprite BuildPowerStrikeIcon()
+        {
+            var c = IconTile(Rgb(0x6b2d1f));
+            c.Line(4, 4, 12, 12, Blade);  // blade
+            c.Line(5, 4, 12, 11, BladeShade);
+            c.Line(3, 7, 7, 3, Gold);     // guard
+            c.Line(2, 2, 3, 3, Grip);
+            c.Line(13, 13, 15, 15, Rgb(0xfff09a)); // glint at the tip
+            c[15, 13] = Gold;
+            c[13, 15] = Gold;
+            c.Outline(Line);
+            return MakeSprite(c, 9f, 9f, "PowerStrikeIcon");
+        }
+
+        Sprite BuildSlashBlastIcon()
+        {
+            var c = IconTile(Rgb(0x1f3a6b));
+            for (int y = 0; y < 18; y++)
+            {
+                for (int x = 0; x < 18; x++)
+                {
+                    float dx = x + 0.5f - 4f, dy = y + 0.5f - 9f;
+                    float r = Mathf.Sqrt(dx * dx + dy * dy);
+                    if (dx > 0f && r >= 8f && r <= 11f && x < 17 && y > 0 && y < 17)
+                        c[x, y] = r < 9.5f ? Rgb(0xbfe3ff) : Rgb(0x6fb2ff);
+                }
+            }
+            c.Line(3, 3, 9, 9, Blade);
+            c.Line(2, 6, 6, 2, Gold);
+            c.Outline(Line);
+            return MakeSprite(c, 9f, 9f, "SlashBlastIcon");
+        }
+
+        Sprite BuildRageIcon()
+        {
+            var c = IconTile(Rgb(0x5a1414));
+            c.FillEllipse(9f, 6.5f, 5f, 4.5f, Rgb(0xe8412c));
+            c.FillEllipse(9f, 9f, 3.5f, 6f, Rgb(0xe8412c));
+            c.FillEllipse(9f, 6f, 3f, 3f, Rgb(0xff9a2c));
+            c.FillEllipse(9f, 5.5f, 1.5f, 1.8f, Rgb(0xffe27a));
+            c[6, 14] = Rgb(0xff9a2c);
+            c[12, 13] = Rgb(0xff9a2c);
+            c.Outline(Line);
+            return MakeSprite(c, 9f, 9f, "RageIcon");
         }
 
         // ---------------------------------------------------------------- scenery

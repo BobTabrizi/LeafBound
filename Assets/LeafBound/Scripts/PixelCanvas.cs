@@ -51,6 +51,30 @@ namespace LeafBound
             }
         }
 
+        /// <summary>A straight one-pixel line (Bresenham), endpoints included.</summary>
+        public void Line(int x0, int y0, int x1, int y1, Color32 color)
+        {
+            int dx = Mathf.Abs(x1 - x0), dy = -Mathf.Abs(y1 - y0);
+            int sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+            int err = dx + dy;
+            while (true)
+            {
+                this[x0, y0] = color;
+                if (x0 == x1 && y0 == y1) return;
+                int e2 = 2 * err;
+                if (e2 >= dy)
+                {
+                    err += dy;
+                    x0 += sx;
+                }
+                if (e2 <= dx)
+                {
+                    err += dx;
+                    y0 += sy;
+                }
+            }
+        }
+
         /// <summary>Recolors opaque pixels in rows at or below maxY.</summary>
         public void ShadeBelow(int maxY, Color32 color)
         {

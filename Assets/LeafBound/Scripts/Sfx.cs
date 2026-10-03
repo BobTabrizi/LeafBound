@@ -11,7 +11,7 @@ namespace LeafBound
         const float Tau = Mathf.PI * 2f;
 
         public float Volume = 0.35f;
-        public readonly AudioClip Jump, Swing, Hit, Kill, LevelUp, Hurt;
+        public readonly AudioClip Jump, Swing, Hit, Kill, LevelUp, Hurt, Pickup, Potion, Skill, Buff;
 
         readonly AudioSource source;
         readonly List<AudioClip> owned = new List<AudioClip>();
@@ -56,6 +56,24 @@ namespace LeafBound
             {
                 float cycles = Sweep(t, T, 320f, 110f) / Tau;
                 return (cycles - Mathf.Floor(cycles) - 0.5f) * 0.6f * (1f - t / T);
+            });
+
+            Pickup = Make("Pickup", 0.12f, (t, T) => Mathf.Sin(Tau * (t < 0.05f ? 880f : 1320f) * t) * 0.3f * (1f - t / T));
+
+            // A wobbling tone, like a gulp.
+            Potion = Make("Potion", 0.25f, (t, T) =>
+                Mathf.Sin(Tau * (500f * t - 200f / (Tau * 18f) * Mathf.Cos(Tau * 18f * t))) * 0.3f * (1f - t / T));
+
+            Skill = Make("Skill", 0.3f, (t, T) => Triangle(Sweep(t, T, 400f, 1400f)) * 0.3f * (1f - t / T));
+
+            float[] buffNotes = { 392f, 523.25f, 659.25f, 783.99f };
+            Buff = Make("Buff", 0.45f, (t, T) =>
+            {
+                const float step = 0.06f;
+                int index = Mathf.Min(buffNotes.Length - 1, Mathf.FloorToInt(t / step));
+                float lastStart = step * (buffNotes.Length - 1);
+                float env = index < buffNotes.Length - 1 ? 1f : 1f - (t - lastStart) / (T - lastStart);
+                return Square(Tau * buffNotes[index] * t) * 0.18f * env;
             });
         }
 
